@@ -92,7 +92,7 @@
         
         .input-group {
             flex: 1;
-            min-width: 250px;
+            min-width: 200px;
         }
         
         label {
@@ -101,12 +101,19 @@
             font-weight: 500;
         }
         
-        input[type="text"] {
+        select, input[type="checkbox"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: var(--border-radius);
             font-size: 1rem;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0;
         }
         
         button {
@@ -177,7 +184,7 @@
         
         .params-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
         }
         
@@ -203,6 +210,18 @@
             border-radius: var(--border-radius);
             overflow: hidden;
             border: 1px solid #ddd;
+            position: relative;
+            background-color: #f0f0f0;
+        }
+        
+        .map-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+            gap: 15px;
+            color: #666;
         }
         
         iframe {
@@ -238,6 +257,10 @@
                 width: 100%;
                 justify-content: center;
             }
+            
+            .input-group {
+                min-width: 100%;
+            }
         }
     </style>
 </head>
@@ -269,22 +292,26 @@
                     </select>
                 </div>
                 <div class="input-group">
-                    <label for="reference">airport</label>
-                    <select id="airport" name="airport" required>
-                        <option value="" disabled selected>select number of airport </option>
+                    <label for="num_airports">Number of Airports:</label>
+                    <select id="num_airports" name="num_airports" required>
+                        <option value="" disabled selected>Select number of airports</option>
                         <option value="3">3</option>
                         <option value="4">4</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label for="reference">marks</label>
+                    <label for="marks">Marks:</label>
                     <select id="marks" name="marks" required>
-                        <option value="" disabled selected>select number of airport </option>
+                        <option value="" disabled selected>Select marks</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
                     </select>
                 </div>
-                <button type="submit"><i class="fas fa-calculator"></i> Generate Question & Map</button>
+                <div class="input-group checkbox-group">
+                    <input type="checkbox" id="show_map" name="show_map" checked>
+                    <label for="show_map">Show Map</label>
+                </div>
+                <button type="submit"><i class="fas fa-calculator"></i> Generate Question</button>
             </form>
         </div>
         
@@ -306,10 +333,13 @@
                 <div id="parameters" class="params-grid"></div>
             </div>
             
-            <div class="card">
+            <div id="mapCard" class="card">
                 <h2 class="section-title"><i class="fas fa-map-marked-alt"></i> Flight Map</h2>
                 <div id="mapContainer" class="map-container">
-                    <p>Map loading...</p>
+                    <div class="map-placeholder">
+                        <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                        <p>Generate a question to view the flight map</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -324,6 +354,7 @@
     <script>
         $(document).ready(function() {
             let previousUrl = null; // Track previous Blob URL to prevent memory leaks
+            let currentDetails = null; // Store current question details for map requests
 
             $('#generateForm').submit(function(e) {
                 e.preventDefault();
@@ -331,21 +362,36 @@
                 // Reset UI state
                 $('#errorMessage').hide();
                 $('#results').hide();
+                $('#mapContainer').html(`
+                    <div class="map-placeholder">
+                        <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                        <p>Loading map...</p>
+                    </div>
+                `);
                 $('#loader').show();
                 
-                var reference = $('#reference').val().trim().toUpperCase();
-                if (!reference) {
-                    showError('Please enter a valid reference (e.g., L1)');
+                const reference = $('#reference').val().trim().toUpperCase();
+                const num_airports = $('#num_airports').val().trim();
+                const marks = $('#marks').val().trim();
+                const show_map = $('#show_map').is(':checked');
+
+                if (!reference || !num_airports || !marks) {
+                    showError('Please fill in all required fields');
+                    $('#loader').hide();
                     return;
                 }
-                var airport=$('#airport').val().trim().toUpperCase();
-                var marks=$('#marks').val().trim().toUpperCase();
-                // Make AJAX request
+
+                // Make AJAX request to generate question
                 $.ajax({
                     url: '/generate_question',
                     type: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ reference: reference,num_airports:airport,marks:marks }),
+                    data: JSON.stringify({
+                        reference: reference,
+                        num_airports: num_airports,
+                        marks: marks,
+                        show_map: show_map
+                    }),
                     success: function(data) {
                         $('#loader').hide();
                         
@@ -353,13 +399,16 @@
                             showError('Invalid response from server');
                             return;
                         }
+
+                        currentDetails = data.details; // Store details for potential map requests
+                        console.log('AJAX success');
+                        console.log('Details object:', JSON.stringify(data.details, null, 2));
                         
                         // Display question
-                        const details = data.details;
-                        console.log(details)
                         $('#question').html(`<p>${data.question}</p>`);
                         
                         // Display parameters
+                        const details = data.details;
                         const parametersHtml = `
                             <div class="param-card">
                                 <div class="param-title">Departure</div>
@@ -382,46 +431,51 @@
                                 <div class="param-value">FL${details.cruise_level}</div>
                             </div>
                             <div class="param-card">
-                                <div class="param-title">Normal TAS</div>
-                                <div class="param-value">${details.tas_normal} kt</div>
-                            </div>
-                            <div class="param-card">
-                                <div class="param-title">Single Engine TAS</div>
+                                <div class="param-title">True Airspeed</div>
                                 <div class="param-value">${details.tas_single_engine} kt</div>
                             </div>
                             <div class="param-card">
-                                <div class="param-title">Normal Wind</div>
-                                <div class="param-value">${details.wind_normal.direction}°/${details.wind_normal.speed} kt</div>
-                            </div>
-                            <div class="param-card">
-                                <div class="param-title">Single Engine Wind</div>
+                                <div class="param-title">Wind</div>
                                 <div class="param-value">${details.wind_single_engine.direction}°/${details.wind_single_engine.speed} kt</div>
                             </div>
                             <div class="param-card">
-                                <div class="param-title">Configuration Type</div>
-                                <div class="param-value">${details.shape_type}</div>
-                            </div>
-                             <div class="param-card">
-                                <div class="param-title">distance between the intersection point to p3  is </div>
-                                <div class="param-value">${details.geodesic.distance_to_P3_nm}</div>
-                            </div>
-                             <div class="param-card">
-                                <div class="param-title">how many steps from interspection  </div>
-                                <div class="param-value">${details.geodesic.distance_to_degree}</div>
+                                <div class="param-title">Ground Speed to Alt 1</div>
+                                <div class="param-value">${Math.round(details.gs)} kt</div>
                             </div>
                             <div class="param-card">
-                                <div class="param-title">distance between the intersection point to p3  is </div>
-                                <div class="param-value">${details.geodesic.distance_to_P3_nm}</div>
+                                <div class="param-title">Ground Speed to Alt 2</div>
+                                <div class="param-value">${Math.round(details.cs)} kt</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-title">Time Difference</div>
+                                <div class="param-value">${details.time} sec</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-title">Distance to Alt 1</div>
+                                <div class="param-value">${Math.round(details.geodesic.distance_to_P3_nm_1)} nm</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-title">Distance to Alt 2</div>
+                                <div class="param-value">${Math.round(details.geodesic.distance_to_P4_nm)} nm</div>
+                            </div>
+                            <div class="param-card">
+                                <div class="param-title">Answers</div>
+                                <div class="param-value">${details.geodesic?.distance_to_P1_nm ?? 'N/A'} nm</div>
                             </div>
                              <div class="param-card">
-                                <div class="param-title">Final Answers is </div>
-                                <div class="param-value">${details.geodesic.distance_to_P1_nm}</div>
+                                <div class="param-title">wind vector</div>
+                                <div class="param-value">${Math.round( details.geodesic?.distance_to_degree) ?? 'N/A'} nm</div>
                             </div>
+                             <div class="param-card">
+                                <div class="param-title">Nil point distance to ${details.land1_name}</div>
+                                <div class="param-value">${Math.round(details.geodesic?.distance_to_P3_nm) ?? 'N/A'} nm</div>
+                            </div>
+                            
                         `;
                         $('#parameters').html(parametersHtml);
                         
                         // Display the map
-                        if (data.details.geodesic_1 && data.details.geodesic_1.map_html) {
+                        if (show_map && data.map_data && data.details.geodesic_1 && data.details.geodesic_1.map_html) {
                             // Clean up previous Blob URL
                             if (previousUrl) {
                                 URL.revokeObjectURL(previousUrl);
@@ -442,21 +496,23 @@
                                 ></iframe>
                             `);
                             
-                            // Debug: Log when iframe loads
                             $('#mapContainer iframe').on('load', function() {
                                 console.log('Map iframe loaded successfully');
                             });
                         } else {
                             $('#mapContainer').html(`
-                                <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:15px;">
-                                    <i class="fas fa-map-marked-alt" style="font-size:48px;color:#ccc;"></i>
-                                    <p>No map data available for this reference.</p>
+                                <div class="map-placeholder">
+                                    <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                                    <p>Map display disabled or no map data available</p>
                                 </div>
                             `);
                         }
                         
                         // Show results section
                         $('#results').fadeIn(300);
+                        
+                        // Show/hide map card based on show_map
+                        $('#mapCard').toggle(show_map);
                         
                         // Scroll to results
                         $('html, body').animate({
@@ -469,7 +525,96 @@
                     }
                 });
             });
-            
+
+            // Function to request map data for existing question
+            function requestMapData() {
+                if (!currentDetails || !$('#reference').val()) {
+                    showError('No question data available. Generate a new question first.');
+                    return;
+                }
+
+                $('#mapContainer').html(`
+                    <div class="map-placeholder">
+                        <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                        <p>Loading map...</p>
+                    </div>
+                `);
+                $('#loader').show();
+
+                $.ajax({
+                    url: '/get_map_data',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        question_details: currentDetails,
+                        reference: $('#reference').val().trim().toUpperCase()
+                    }),
+                    success: function(data) {
+                        $('#loader').hide();
+                        
+                        if (data.geodesic_1 && data.geodesic_1.map_html) {
+                            if (previousUrl) {
+                                URL.revokeObjectURL(previousUrl);
+                            }
+                            
+                            const mapHtml = data.geodesic_1.map_html;
+                            const blob = new Blob([mapHtml], {type: 'text/html'});
+                            const url = URL.createObjectURL(blob);
+                            previousUrl = url;
+                            
+                            $('#mapContainer').html(`
+                                <iframe 
+                                    src="${url}"
+                                    style="width: 100%; height: 100%; border: none;"
+                                    allowfullscreen
+                                    webkitallowfullscreen
+                                    mozallowfullscreen
+                                ></iframe>
+                            `);
+                            
+                            $('#mapContainer iframe').on('load', function() {
+                                console.log('Map iframe loaded successfully');
+                            });
+                            
+                            $('#mapCard').show();
+                        } else {
+                            showError('No map data available for this reference');
+                            $('#mapContainer').html(`
+                                <div class="map-placeholder">
+                                    <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                                    <p>No map data available</p>
+                                </div>
+                            `);
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#loader').hide();
+                        showError(xhr.responseJSON?.error || 'Failed to load map data');
+                        $('#mapContainer').html(`
+                            <div class="map-placeholder">
+                                <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                                <p>Failed to load map</p>
+                            </div>
+                        `);
+                    }
+                });
+            }
+
+            // Handle show_map checkbox change
+            $('#show_map').change(function() {
+                if ($(this).is(':checked') && currentDetails) {
+                    requestMapData();
+                } else {
+                    $('#mapCard').hide();
+                    $('#mapContainer').html(`
+                        <div class="map-placeholder">
+                            <i class="fas fa-map-marked-alt" style="font-size:48px;"></i>
+                            <p>Map display disabled</p>
+                        </div>
+                    `);
+                }
+            });
+
             function showError(message) {
                 $('#errorText').text(message);
                 $('#errorMessage').fadeIn(300);

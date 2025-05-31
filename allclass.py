@@ -382,222 +382,224 @@ class AirportQuestionGenerator:
     
         raise ValueError(f"Could not find valid airport configuration for reference {specified_reference} after {max_attempts} attempts")
     def generate_question_with_reference(self, specified_reference, num_airports):
-            max_attempts = 22200
-            attempts = 0
-            
-            if num_airports not in [3, 4]:
-                raise ValueError("num_airports must be 3 or 4")
+        max_attempts = 22200
+        attempts = 0
 
-            # Define maximum distances for each reference level
-            max_distances = {
-                'L1': 226.415095,
-                'L2': 220.858896,
-                'L3': 187.5,
-                'L4':327.27272700000003,
-                'L5':346.153846,
-                'L6':  500 ,
-                'L7': 486.4844869999999,
-                'L8': 473.68423
-            }
-            
-            max_distance = max_distances.get(specified_reference)
-            if max_distance is None:
-                raise ValueError(f"Invalid reference level: {specified_reference}")
+        if num_airports not in [3, 4]:
+            raise ValueError("num_airports must be 3 or 4")
 
-            while attempts < max_attempts:
-                attempts += 1
-                try:
-                    selected = self.select_airports_for_shape_with_reference(specified_reference, num_airports)
-                    
+        max_distances = {
+            'L1': 226.415095,
+            'L2': 220.858896,
+            'L3': 187.5,
+            'L4': 327.27272700000003,
+            'L5': 346.153846,
+            'L6': 500,
+            'L7': 486.4844869999999,
+            'L8': 473.68423
+        }
+
+        max_distance = max_distances.get(specified_reference)
+        if max_distance is None:
+            raise ValueError(f"Invalid reference level: {specified_reference}")
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
+                selected = self.select_airports_for_shape_with_reference(specified_reference, num_airports)
+                
+                dep = selected["dep"]
+                arr = selected["arr"]
+                eland = selected["eland"]
+                eland2 = selected["eland2"]
+                
+                if num_airports == 3:
                     dep = selected["dep"]
                     arr = selected["arr"]
-                    eland = selected["eland"]
+                    eland = arr 
                     eland2 = selected["eland2"]
-                    
-                    if num_airports == 3:
-                        dep = selected["dep"]
-                        arr = selected["arr"]
-                        eland = arr 
-                        eland2 = selected["eland2"]
-                    
-                    # Calculate all required distances
-                    P1 = (dep.lat, dep.long)
-                    P2 = (arr.lat, arr.long)
-                    P3 = (eland.lat, eland.long)
-                    P4 = (eland2.lat, eland2.long)
-                    
-                    # Calculate distances using geodesic
-                    geod = Geodesic.WGS84
-                    
-                    # P1-P2 distance
-                    p1p2 = geod.Inverse(P1[0], P1[1], P2[0], P2[1])
-                    p1p2_dist = p1p2['s12'] / 1852.0  # Convert meters to nautical miles
-                    
-                    # P3-P4 distance
-                    p3p4 = geod.Inverse(P3[0], P3[1], P4[0], P4[1])
-                    p3p4_dist = p3p4['s12'] / 1852.0
-                    
-                    # Midpoint of P1-P2
-                    mp_p1p2 = geod.InverseLine(P1[0], P1[1], P2[0], P2[1]).Position(0.5)
-                    mp_p1p2_point = (mp_p1p2['lat2'], mp_p1p2['lon2'])
-                    
-                    # Midpoint of P3-P4
-                    mp_p3p4 = geod.InverseLine(P3[0], P3[1], P4[0], P4[1]).Position(0.5)
-                    mp_p3p4_point = (mp_p3p4['lat2'], mp_p3p4['lon2'])
-                    
-                    # Distance between midpoints
-                    mid_dist = geod.Inverse(mp_p1p2_point[0], mp_p1p2_point[1], 
-                                        mp_p3p4_point[0], mp_p3p4_point[1])
-                    mid_dist_nm = mid_dist['s12'] / 1852.0
-                    
-                    # Check all distance constraints
-                    if (p1p2_dist > max_distance or 
-                        p3p4_dist > max_distance or 
-                        mid_dist_nm > max_distance):
-                        logging.debug(f"Distance constraints not met for {specified_reference}: "
-                                    f"P1-P2={p1p2_dist:.2f}nm, P3-P4={p3p4_dist:.2f}nm, "
-                                    f"Midpoints={mid_dist_nm:.2f}nm (max={max_distance}nm)")
-                        continue
-                    
-                    # Rest of your existing code for question generation...
-                    cruise_level = random.choice([150, 170, 190, 210, 230])
-                    normal_min, normal_max = 240, 250
-                    single_min, single_max = 180, 200
-
-                    normal_choices = list(range(normal_min, normal_max + 1, 5))
-                    single_choices = list(range(single_min, single_max + 1, 5))
-
-                    tas_normal = random.choice(normal_choices)
-                    tas_single_engine = random.choice(single_choices)
-                    
-                    track = 270
-                    wind_dir_raw = (track + 180 + (random.random() - 0.5) * 60) % 360
-                    wind_dir_rounded = round(wind_dir_raw / 10) * 10
-                    if wind_dir_rounded < 100:
-                        wind_dir_rounded += 100
-                    wind_dir_rounded = min(wind_dir_rounded, 350)
-                    wind_dir_normal = int(wind_dir_rounded)
-                    min_speed = 40
-                    max_speed = 70
-                    possible_values = list(range(min_speed, max_speed + 1, 5))
-                    wind_speed_normal = random.choice(possible_values)
-                    
-                    wind_dir_raw = (wind_dir_normal + (random.random() - 0.5) * 20) % 360
-                    wind_dir_rounded = round(wind_dir_raw / 10) * 10
-                    if wind_dir_rounded < 100:
-                        wind_dir_rounded += 100
-                    wind_dir_rounded = min(wind_dir_rounded, 350)
-                    wind_dir_single = int(wind_dir_rounded)
-                    raw_speed = wind_speed_normal * (0.8 + random.random() * 0.4)
-                    rounded_speed = round(raw_speed / 5) * 5
-                    if rounded_speed >= 90:
-                        rounded_speed = 85
-                    wind_speed_single = int(rounded_speed)
-                    
-                    question_text = (
-                        f"Refer ERC {selected['reference']}. You are planning a flight from {dep.name}{dep.code} to {arr.name}{dep.code} "
-                        f"direct  at FL{cruise_level} with a TAS of {tas_normal} kt for normal operations "
-                        f"and single engine TAS of {tas_single_engine} kt. WV {wind_dir_normal}M / {wind_speed_normal} kt "
-                        f"at FL{cruise_level} (normal ops crz), WV {wind_dir_single}M / {wind_speed_single} kt for single "
-                        f"engine cruise level. Your calculation of the location of the single engine CP (Critical Point) "
-                        f"for {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, measured as a distance "
-                        f"from {dep.name} is -"
-                    )
-                    
-                    details = QuestionDetails(
-                        departure=dep,
-                        arrival=arr,
-                        land1=eland,
-                        land2=eland2,
-                        cruise_level=cruise_level,
-                        tas_normal=tas_normal,
-                        tas_single_engine=tas_single_engine,
-                        wind_normal={"direction": wind_dir_normal, "speed": wind_speed_normal},
-                        wind_single_engine={"direction": wind_dir_single, "speed": wind_speed_single},
-                        shape_type=selected["shapeType"],
-                        reference=selected["reference"]
-                    )
-                    
-                    question = CurrentQuestion(question=question_text, details=details)
-                    
-                    tas_single = tas_single_engine
-                    wind_speed_single = wind_speed_single
-                    wind_dir_single = wind_dir_single % 360
-                    
-                    if P1 == P2 or P3 == P4 or tas_single <= 0 or wind_speed_single < 0:
-                        logging.debug(f"Invalid parameters: P1={P1}, P2={P2}, P3={P3}, P4={P4}, tas={tas_single}, wind_speed={wind_speed_single}")
-                        continue
-                    
-                    # Compute geodesic results
-                    geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_single, wind_speed_single, wind_dir_single)
-                    
-                    if geodesic_results is None:
-                        logging.warning(f"Geodesic calculation failed for: {dep.code}-{arr.code}-{eland.code}-{eland2.code}")
-                        continue
-                    
-                    # Calculate time difference
-                    distance_p3 = geodesic_results['distance_to_P3_nm_1']
-                    distance_p4 = geodesic_results['distance_to_P4_nm']
-                    critical_point_data = geodesic_results.get('critical_point')
-                    if isinstance(critical_point_data, (list, tuple)) and len(critical_point_data) == 2:
-                        critical_point_obj = Point(critical_point_data[0], critical_point_data[1])
-                    elif hasattr(critical_point_data, 'lat') and hasattr(critical_point_data, 'long'):
-                        critical_point_obj = critical_point_data
-                    else:
-                        logging.error(f"Invalid critical_point type: {type(critical_point_data)}")
-                        continue
-                    nav = Navigation()
-
-
-                    mid_house = nav.get_midpoint(critical_point_obj, eland)
-                    mid_land1 = nav.get_midpoint(critical_point_obj, eland2) 
-                    course_from_home = nav.get_track_angle(mid_house,eland)
-                    course_from_land1 = nav.get_track_angle(mid_land1, eland2)
-                    
-                    # Calculate groundspeeds using wind effects (from Flask code's calculate_wind_effects)
-                    def calculate_ground_speed(true_course, tas, wind_dir, wind_speed):
-                        """
-                        Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
-                        
-                        Args:
-                            true_course (float): Intended flight path in degrees (clockwise from north).
-                            tas (float): True airspeed in knots.
-                            wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
-                            wind_speed (float): Wind speed in knots.
-                        
-                        Returns:
-                            float: Ground speed in knots.
-                        """
-                        tc_rad = math.radians(true_course)
-                        wd_rad = math.radians(wind_dir)
-                        wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
-                        gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
-                        return gs
-                        
-                    gs = calculate_ground_speed(course_from_home, tas_single, wind_dir_single, wind_speed_single)
-                    cs = calculate_ground_speed(course_from_land1, tas_single, wind_dir_single, wind_speed_single)
-                    
-                    time_p3 = distance_p3 / gs
-                    time_p4 = distance_p4 / cs
-                    time = time_p3 - time_p4
-                    
-                    # Check if time difference is within 2 minutes (0.03333 hours)
-                    if abs(time) > 0.033333333333:
-                        logging.debug(f"Time difference {time*60:.2f} minutes exceeds 2 minutes")
-                        continue
-                    
-                    # Try to calculate critical point
-                    try:
-                        critical_point = self.calculate_critical_point(question)
-                        if critical_point is not None:
-                            return question
-                        else:
-                            logging.debug(f"Critical point calculation returned None")
-                    except Exception as e:
-                        logging.debug(f"Critical point calculation failed: {str(e)}")
-                        
-                except Exception as e:
-                    logging.debug(f"Attempt {attempts} failed: {str(e)}")
+                
+                # Calculate distances using geodesic
+                geod = Geodesic.WGS84
+                P1 = (dep.lat, dep.long)
+                P2 = (arr.lat, arr.long)
+                P3 = (eland.lat, eland.long)
+                P4 = (eland2.lat, eland2.long)
+                
+                p1p2 = geod.Inverse(P1[0], P1[1], P2[0], P2[1])
+                p1p2_dist = p1p2['s12'] / 1852.0
+                p3p4 = geod.Inverse(P3[0], P3[1], P4[0], P4[1])
+                p3p4_dist = p3p4['s12'] / 1852.0
+                
+                mp_p1p2 = geod.InverseLine(P1[0], P1[1], P2[0], P2[1]).Position(0.5)
+                mp_p1p2_point = (mp_p1p2['lat2'], mp_p1p2['lon2'])
+                mp_p3p4 = geod.InverseLine(P3[0], P3[1], P4[0], P4[1]).Position(0.5)
+                mp_p3p4_point = (mp_p3p4['lat2'], mp_p3p4['lon2'])
+                
+                mid_dist = geod.Inverse(mp_p1p2_point[0], mp_p1p2_point[1], 
+                                      mp_p3p4_point[0], mp_p3p4_point[1])
+                mid_dist_nm = mid_dist['s12'] / 1852.0
+                if p1p2_dist <= 100:
+                    logging.debug(f"P1P2 distance {p1p2_dist:.1f}nm is less than or equal to 100nm")
                     continue
                     
-            raise ValueError(f"Could not generate valid question for reference {specified_reference} after {max_attempts} attempts")
+                if p3p4_dist >= (p1p2_dist * 0.95):
+                    logging.debug(f"P3P4 distance {p3p4_dist:.1f} not less than 85% of P1P2 {p1p2_dist:.1f}")
+                    continue
+                
+                if (p1p2_dist > max_distance or 
+                    p3p4_dist > max_distance or 
+                    mid_dist_nm > max_distance):
+                    logging.debug(f"Distance constraints not met for {specified_reference}: "
+                                f"P1-P2={p1p2_dist:.2f}nm, P3-P4={p3p4_dist:.2f}nm, "
+                                f"Midpoints={mid_dist_nm:.2f}nm (max={max_distance}nm)")
+                    continue
+                
+                # Generate question parameters
+                cruise_level = random.choice([150, 170, 190, 210, 230])
+                normal_min, normal_max = 240, 250
+                single_min, single_max = 180, 200
+                normal_choices = list(range(normal_min, normal_max + 1, 5))
+                single_choices = list(range(single_min, single_max + 1, 5))
+                tas_normal = random.choice(normal_choices)
+                tas_single_engine = random.choice(single_choices)
+                
+                # Define valid wind direction ranges (035–075, 105–165, 195–255, 285–345, multiples of 5)
+                wind_direction_ranges = [
+                    list(range(35, 76, 5)),
+                    list(range(105, 166, 5)),
+                    list(range(195, 256, 5)),
+                    list(range(285, 346, 5))
+                ]
+                valid_wind_directions = [direction for sublist in wind_direction_ranges for direction in sublist]
+
+                # Select wind_dir_normal
+                wind_dir_normal = random.choice(valid_wind_directions)
+
+                # Select wind_dir_single (within ±20° of wind_dir_normal)
+                possible_single_directions = [
+                    d for d in valid_wind_directions
+                    if abs((d - wind_dir_normal + 180) % 360 - 180) <= 20
+                ]
+                wind_dir_single = random.choice(possible_single_directions if possible_single_directions else valid_wind_directions)
+                
+                # Wind speed logic
+                min_speed = 40
+                max_speed = 70
+                possible_values = list(range(min_speed, max_speed + 1, 5))
+                wind_speed_normal = random.choice(possible_values)
+                
+                raw_speed = wind_speed_normal * (0.8 + random.random() * 0.4)
+                rounded_speed = round(raw_speed / 5) * 5
+                if rounded_speed >= 90:
+                    rounded_speed = 85
+                wind_speed_single = int(rounded_speed)
+                
+                question_text = (
+                    f"Refer ERC {selected['reference']}. You are planning a flight from {dep.name}{dep.code} to {arr.name}{arr.code} "
+                    f"direct at FL{cruise_level} with a TAS of {tas_normal} kt for normal operations "
+                    f"and single engine TAS of {tas_single_engine} kt. WV {wind_dir_normal}M / {wind_speed_normal} kt "
+                    f"at FL{cruise_level} (normal ops crz), WV {wind_dir_single}M / {wind_speed_single} kt for single "
+                    f"engine cruise level. Your calculation of the location of the single engine CP (Critical Point) "
+                    f"for {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, measured as a distance "
+                    f"from {dep.name} is -"
+                )
+                
+                details = QuestionDetails(
+                    departure=dep,
+                    arrival=arr,
+                    land1=eland,
+                    land2=eland2,
+                    cruise_level=cruise_level,
+                    tas_normal=tas_normal,
+                    tas_single_engine=tas_single_engine,
+                    wind_normal={"direction": wind_dir_normal, "speed": wind_speed_normal},
+                    wind_single_engine={"direction": wind_dir_single, "speed": wind_speed_single},
+                    shape_type=selected["shapeType"],
+                    reference=selected["reference"]
+                )
+                
+                question = CurrentQuestion(question=question_text, details=details)
+                
+                tas_single = tas_single_engine
+                wind_speed_single = wind_speed_single
+                wind_dir_single = wind_dir_single % 360
+                
+                if P1 == P2 or P3 == P4 or tas_single <= 0 or wind_speed_single < 0:
+                    logging.debug(f"Invalid parameters: P1={P1}, P2={P2}, P3={P3}, P4={P4}, tas={tas_single}, wind_speed={wind_speed_single}")
+                    continue
+                
+                geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_single, wind_speed_single, wind_dir_single)
+                
+                if geodesic_results is None:
+                    logging.warning(f"Geodesic calculation failed for: {dep.code}-{arr.code}-{eland.code}-{eland2.code}")
+                    continue
+                
+                distance_p3 = geodesic_results['distance_to_P3_nm_1']
+                distance_p4 = geodesic_results['distance_to_P4_nm']
+                critical_point_data = geodesic_results.get('critical_point')
+                if isinstance(critical_point_data, (list, tuple)) and len(critical_point_data) == 2:
+                    critical_point_obj = Point(critical_point_data[0], critical_point_data[1])
+                elif hasattr(critical_point_data, 'lat') and hasattr(critical_point_data, 'long'):
+                    critical_point_obj = critical_point_data
+                else:
+                    logging.error(f"Invalid critical_point type: {type(critical_point_data)}")
+                    continue
+                
+                nav = Navigation()
+                mid_house = nav.get_midpoint(critical_point_obj, eland)
+                mid_land1 = nav.get_midpoint(critical_point_obj, eland2) 
+                course_from_home = nav.get_track_angle(mid_house, eland)
+                course_from_land1 = nav.get_track_angle(mid_land1, eland2)
+                
+                def calculate_ground_speed(true_course, tas, wind_dir, wind_speed):
+                    """
+                    Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
+                    
+                    Args:
+                        true_course (float): Intended flight path in degrees (clockwise from north).
+                        tas (float): True airspeed in knots.
+                        wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
+                        wind_speed (float): Wind speed in knots.
+                    
+                    Returns:
+                        float: Ground speed in knots.
+                    """
+                    tc_rad = math.radians(true_course)
+                    wd_rad = math.radians(wind_dir)
+                    wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
+                    gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
+                    return gs
+                
+                gs = calculate_ground_speed(course_from_home, tas_single, wind_dir_single, wind_speed_single)
+                cs = calculate_ground_speed(course_from_land1, tas_single, wind_dir_single, wind_speed_single)
+                
+                time_p3 = distance_p3 / gs
+                time_p4 = distance_p4 / cs
+                time = time_p3 - time_p4
+                
+                if abs(time) > 0.008333333:
+                    logging.debug(f"Time difference {time*60:.2f} minutes exceeds 2 minutes")
+                    continue
+                
+                # Ensure question is a CurrentQuestion object before calculating critical point
+                if not isinstance(question, CurrentQuestion):
+                    logging.error(f"Invalid question type: {type(question)}, value: {question}")
+                    continue
+                
+                try:
+                    logging.debug(f"Before calculate_critical_point: type(question)={type(question)}, question={question}")
+                    critical_point = self.calculate_critical_point(question)
+                    if critical_point is not None:
+                        return question
+                    else:
+                        logging.debug(f"Critical point calculation returned None")
+                except Exception as e:
+                    logging.debug(f"Critical point calculation failed: {str(e)}")
+                    continue
+                    
+            except Exception as e:
+                logging.debug(f"Attempt {attempts} failed: {str(e)}")
+                continue
+        
+        raise ValueError(f"Could not generate valid question for reference")

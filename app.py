@@ -1,3 +1,4 @@
+from venv import logger
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import random
@@ -6,6 +7,8 @@ from math import cos, sin, atan2, sqrt, radians, degrees, asin
 import datetime
 import logging
 from typing import Dict, List, NamedTuple
+import logging
+from fuzzywuzzy import fuzz
 
 from geographiclib.geodesic import Geodesic
 import scipy.optimize as optimize
@@ -16,35 +19,8 @@ from firebase_admin import credentials, firestore
 cred = credentials.Certificate({
     "type": "service_account",
     "project_id": "airplane-49087",
-    "private_key_id": "c52df395076eb737731760f67a5a204bfee225e9",
-    "private_key": """-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDejFv78wrvLc6n
-CaAh7cMDGZZHNzdXW70KSMTXfjjlrROqTOdYXzo67v3urpgL2lRPyIWjcYMefL5B
-PbCq6VQODs9rMvRmXbSHmf+0knJoVnWdU0bslQVj60zYsSmkwItOBjNM8ghx0Cmc
-v1ksBppil68NFz69HkKIQ4fu3awCc1wrjsVWOce0vEJeBBRHpLpj7JYo0yRxcdvP
-b8S9lVJvby/Peg9n+upkkz7XGebi/F6AB6iFvBAu/tnajOCqkzmgOxOvsBwk/m/K
-cDsggdK3+2exmvE9UbB0nHQOkziWMgEAmp2VZDm0OAoco2/IMfWe0lGkU2hpCT8G
-7JtYtuVdAgMBAAECggEABwTgRdMFjkOgl+4aydco5mkhLz/TlALFtJRU+QL3Im9S
-BnYEeeoO+RrekW+aRg1tyVJmvJ/w5b5DdeVPNCTFzOe0rQnfYXclIX2+7eAMkbPg
-Y8TjoMSWde9O7iqwSIz2F9DkP1IG6CgLl/EFC/ltVxy3na8VAHv61zdiCyucqDsS
-IrK2IYw0HumKIkXncuLG1fnXZT6w3g4VmkgcS3l/MGe+QKj3yiZg4QFrOESvX4eX
-i4yTkUPL0HDN4Wv/3PpvcZtZKjuyhQwMT2maRW11CDlY1F0g0xhD2fXWBkTkoX9+
-TLFN1ln/O2AT2OWo+dA1O3gBKykhcURp6JXux6MPNQKBgQD7Itl2xL0NVfQSYn5F
-GjC2+FDOL/RKrv+3/fGGyRD6GmEgXWasMKZkYpO4bZ+FeQ7Y3KFYmkzHydQt7q1H
-ypgjBec946NZBRAAVe78yZe8usnfgFx7YimdpqR4rlcuAf0/YUdA1/WgVu3IsgrZ
-Qh+HGkvoxDib0qa8/O9pFC+mzwKBgQDi28Tu7Fo28zKR2RZgun3VAcGCeyarmDf4
-66lFUFD9EPH9ENNNCD74RlO3P4Ec5ch7N6JdkByKYOEQddu49IDLiz5QNrPeJ+lQ
-MAarkoU22VqFIcSRUskWHuHQgqzhyJRk9XN/df2TIDF1MHJ1JjBGLqq+MDL/z/5K
-bhSPFds8EwKBgQCniLAaE1UrOFQCj8I8xyQIa888PbFywRvG2pntmOTCdCanOKft
-5uaZwUlal4b7u66z7TuVqBngjjwGCFuAsR6c/qstFlc6Y64xCyLLcJDRTqqtdyw7
-A1lP2oOOHn/6KUmQpoyqLWem91bZtCyYkwwFTP2m4oABM54YJYRxTQ4c8QKBgDHe
-zCkVzjM8PUawqWm0NYtI6ohLmFGqkctnyvtQz60CN6BBPaI2iNk9ZJPpIvH+VZc4
-wLm+v3dwGqnqrtW28kVMo/MwQ1Q4A+M724uGF0DagTq5FKQ5xbjWKyASSf0Mggq7
-pptDje306spvTwoPzhbvlVtf7yYrTCSClIRr8pj/AoGBALK/fdhPwOcWzcBFKykr
-26Zov7rtLPVV8ZMO+c0X8u1SNabsB2uH1n+dhXNf83McgaoGRyhtvo3d7gUeRSms
-vvYcqwsdJX880ZWIzISEeCtarZCaijh6UeFUqlZsOzLqNc6KrU1P/TmM1IBa7aJT
-tWdLf+ERmSfQ4NeSmspLlFjv
------END PRIVATE KEY-----""",  # ✅ Use triple quotes for multi-line strings
+    "private_key_id": "84e969bd2c76953bb01f12cea7c94c37b338dcc6",
+    "private_key": """-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCdsdQ2iNJsEzH6\nzzK7pLYaTn/u1cTla1RUkCda9AOQdA7DPN7Opyht4m40t7RRrJYozj8Ky4HStfv3\n5dOaL4356P0qIqbMjV34RYZtEe5jyHWosXPQNGaV+pBlL+fuSVSeDFEuYeqiAjqK\n4XkVBpkagpoDKRLHIGRNoAnqKY8X7iD2B/lNvEaQo0F9io/f5lvwJuZQAAA5kPK9\nK4+re0wcZGgbkpdCfmGULvMBfE+i+ExjkuIfX9nh0wIjP5zy//dHl+5tDvl0iOew\n5RcXsAzOGR0UwNohF7cNruBAGpW08OpkTkW658NQwS0mxGy5mn3tMz5DiIihl1y0\nNYdOfW//AgMBAAECggEAHTeaAIKoLgL+cyBZn3+ch9I8jNVJllIk/Uf6KrVkRarj\nI1RPWc2JxZY64gSZYbqO1b+k2YysIIy8Qwlvg7VE4mVDJr/l1KdqnjnPdrzoRM+a\n0ScTtKNI0IfsofrWx4UJqwDQN75HmT29eAbfhsBCtLE29Nfy1TcQrns06xBJJV8c\nd6dt2rfvWgXc4tHmPaiAQtL1RXIUx64jTxvY2OlCASxpzqhxJe100eU0DAq5BQpi\nj6FwvO/OsiMfaZMsYYs5Hoh8IhIbnRXdGQnCYMUsGIEl1rLf3G7n01xLfYXlto0Q\nzXZ+H1vEf7pNRRWmXsLvZF65Xj3kJPmYRg7knvZBQQKBgQDQA8Oynh2iLxldogZ2\nr0rciC8RBaV9iSU7T4H0Zf7fZ7YoZEh95TUXeqPB/eSiQrddkLyOuRnJ4SrrCo0E\nm4ZWN58kwAahX1LlGBY5fKNZlzWbG0R4G8v39CwPYfXlFGtna3F5w2FfIQ4HyPQx\nysMBjiaaz/PoZUQ9+5Ed+dDVvwKBgQDCEm5TcCdighYSmulpTdAR3Nj0hC/wcQwN\ngUQyx12PmXxAQzuj50L4Slmt54Z+SssOTNV0H3R8AwWPf0Zoowt6S8LNJJQZZiuJ\n4LxTL03UBAq/FjesFteCtmBWfCQ4nQFd2t2gsn23/cIoNw3V6nCDaseTgMCAgjL7\n+9ydaKR1wQKBgQCTPFbksy5egd/+epUApQrkFjDaZ5i/xrdnx9tAVoGVOB+jb3gw\nRHDT8aa/xSpz/60yuSP+Ed7DGnH6dDlkrYDkvfITXShUSNiv9+CjSCmHXJRA+Yf5\nTBOPqnEVYk1enJl5Vn+3pCfj4c3AjOjr5Y0qKKgCpHcMY8Ft7gbFpPHAmQKBgQCL\nixsfDa6UCzt5xz97w0KQBX9OWdnqhi6Ha2IxLN7eSRtpTa6NjNS/mR5gh/BR0M+u\niZqVs6RbIwUViAuFY272UZFRVjLTDH7T1e8z1PieMQXVHlGLgKUXTLF6niqhNmts\nI9pmGNGCwYigx+0/2iFqrRWxvssr2/Jy80dPO5W9QQKBgHxVkgeNeD8B9GOFH3mA\nMn05bNqKWFiJU2kBp4rTnzUy+0DiT15NL8SEGyHKRno0Mcm6//DdBTJexomccVvt\nYdVz6J3t67GQCD+FnCZSZvubaygog8/PSNdizRQrIHuLX11Urj9q4BeLA6vuYVRy\npY+B7jrN1sp81hvYQRsDKLbm\n-----END PRIVATE KEY-----\n""",  # ✅ Use triple quotes for multi-line strings
     "client_email": "firebase-adminsdk-fbsvc@airplane-49087.iam.gserviceaccount.com",
     "client_id": "107082013090178902883",
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -230,91 +206,109 @@ def find_airport_by_name(name, reference, airports):
         Airport object if a match is found, else None.
     """
     if not name or not airports:
+        logger.debug("Invalid input: name or airports list is empty")
         return None
     
     # Normalize name for comparison
     name_lower = name.lower().strip()
+    name_upper = name.upper().strip()
     
-    # Handle reference parameter (keep uppercase for L1, L2 matching)
+    # Handle reference parameter (normalize to uppercase)
     reference_list = []
     if isinstance(reference, list):
         reference_list = [ref.upper().strip() for ref in reference if isinstance(ref, str) and ref.strip()]
     elif isinstance(reference, str) and reference.strip():
         reference_list = [reference.upper().strip()]
     
-    # Priority 1: Exact name match (after cleaning)
+    # List to store potential matches with scores
+    candidates = []
+    
     for airport in airports:
+        score = 0
+        details = {"airport": airport, "match_type": []}
+        
+        # Normalize airport attributes
         airport_name_clean = airport.name.lower().strip()
+        airport_code_lower = airport.code.lower().strip()
+        airport_reference = airport.reference.upper().strip() if airport.reference else ""
+        
+        # Priority 1: Exact name match
         if name_lower == airport_name_clean:
-            return airport
-    
-    # Priority 2: Exact airport code match (ICAO codes like YHMT, YMML)
-    name_upper = name.upper().strip()
-    for airport in airports:
+            score += 100
+            details["match_type"].append("exact_name")
+        
+        # Priority 2: Exact airport code match
         if name_upper == airport.code:
-            return airport
-    
-    # Priority 3: Exact reference match (L1, L2, etc.)
-    if reference_list:
-        for airport in airports:
-            if airport.reference in reference_list:
-                return airport
-    
-    # Priority 4: Name starts with search term
-    for airport in airports:
-        airport_name_clean = airport.name.lower().strip()
+            score += 95
+            details["match_type"].append("exact_code")
+        
+        # Priority 3: Exact reference match
+        if reference_list and airport_reference in reference_list:
+            score += 90
+            details["match_type"].append("exact_reference")
+        
+        # Priority 4: Name starts with search term
         if airport_name_clean.startswith(name_lower):
-            return airport
-    
-    # Priority 5: Airport code starts with search term
-    for airport in airports:
-        airport_code_lower = airport.code.lower()
+            score += 85
+            details["match_type"].append("name_starts_with")
+        
+        # Priority 5: Airport code starts with search term
         if airport_code_lower.startswith(name_lower):
-            return airport
-    
-    # Priority 6: Name contains all words from search term
-    name_words = name_lower.split()
-    if len(name_words) > 1:
-        for airport in airports:
-            airport_name_clean = airport.name.lower().strip()
-            if all(word in airport_name_clean for word in name_words):
-                return airport
-    
-    # Priority 7: Partial name match (case insensitive)
-    for airport in airports:
-        airport_name_clean = airport.name.lower().strip()
+            score += 80
+            details["match_type"].append("code_starts_with")
+        
+        # Priority 6: Fuzzy matching for name
+        fuzzy_score = fuzz.ratio(name_lower, airport_name_clean)
+        if fuzzy_score >= 80:
+            score += fuzzy_score * 0.75
+            details["match_type"].append(f"fuzzy_name (score: {fuzzy_score})")
+        
+        # Priority 7: Name contains all words from search term
+        name_words = name_lower.split()
+        if len(name_words) > 1 and all(word in airport_name_clean for word in name_words):
+            score += 70
+            details["match_type"].append("contains_all_words")
+        
+        # Priority 8: Partial name match
         if name_lower in airport_name_clean:
-            return airport
-    
-    # Priority 8: Partial code match (case insensitive)
-    for airport in airports:
-        airport_code_lower = airport.code.lower()
+            score += 65
+            details["match_type"].append("partial_name")
+        
+        # Priority 9: Partial code match
         if name_lower in airport_code_lower or airport_code_lower in name_lower:
-            return airport
-    
-    # Priority 9: Reference partial match in name
-    if reference_list:
-        for airport in airports:
-            airport_name_clean = airport.name.lower().strip()
+            score += 60
+            details["match_type"].append("partial_code")
+        
+        # Priority 10: Reference partial match in name
+        if reference_list:
             for ref in reference_list:
                 if ref.lower() in airport_name_clean:
-                    return airport
-    
-    # Priority 10: Cross-reference matching
-    # Check if search name matches reference and vice versa
-    if reference_list:
-        for airport in airports:
-            # Check if any reference matches airport name
+                    score += 55
+                    details["match_type"].append(f"reference_in_name ({ref})")
+        
+        # Priority 11: Cross-reference matching
+        if reference_list:
             for ref in reference_list:
-                if ref.lower() in airport.name.lower().strip():
-                    return airport
-            
-            # Check if search name matches airport reference
-            name_upper = name.upper().strip()
-            if name_upper == airport.reference:
-                return airport
+                if ref.lower() in airport_name_clean:
+                    score += 50
+                    details["match_type"].append(f"reference_matches_name ({ref})")
+                if name_upper == airport_reference:
+                    score += 50
+                    details["match_type"].append("name_matches_reference")
+        
+        if score > 0:
+            details["score"] = score
+            candidates.append(details)
+        
+        if details["match_type"]:
+            logger.debug(f"Airport: {airport.name} ({airport.code}), Score: {score}, Match Types: {details['match_type']}")
     
-    # No match found
+    if candidates:
+        best_candidate = max(candidates, key=lambda x: x["score"])
+        logger.debug(f"Best match: {best_candidate['airport'].name} ({best_candidate['airport'].code}), Score: {best_candidate['score']}, Match Types: {best_candidate['match_type']}")
+        return best_candidate["airport"]
+    
+    logger.debug("No match found")
     return None
 
 def get_track_angle(self, dep, arr, magnetic=True):
@@ -393,7 +387,6 @@ def find(name,airports):
             return airport  # Return the Airport object directly
     return None
 # Modify calculate_geodesic function to include ground speed calculations
-
 @app.route('/generate_question', methods=['POST'])
 def generate_question_endpoint():
     try:
@@ -406,6 +399,7 @@ def generate_question_endpoint():
         reference = data['reference']
         num_airports = int(data['num_airports'])
         marks = int(data['marks'])
+        show_map = data.get('show_map', False)  # New parameter for map display
 
         # Validate reference
         if not reference.startswith('L') or not reference[1:].isdigit() or int(reference[1:]) < 1 or int(reference[1:]) > 8:
@@ -432,40 +426,45 @@ def generate_question_endpoint():
             
             if not all([dep, arr, land1, land2]):
                 return jsonify({'error': 'Could not find all airports in sample data'}), 400
+            
             def generate_three_digit_multiple_of_10():
-    # Three-digit numbers range from 100 to 999
-    # We need multiples of 10 that are less than 360
-    # So we need numbers from 100 to 350
-    # We can generate a random number between 10 and 35 and multiply by 10
+                # Three-digit numbers range from 100 to 999
+                # We need multiples of 10 that are less than 360
+                # So we need numbers from 100 to 350
+                # We can generate a random number between 10 and 35 and multiply by 10
                 base_number = random.randint(10, 35)
                 return base_number * 10
 
             # Generate random wind and TAS values
             wind_dir = generate_three_digit_multiple_of_10()
+            
             def generate_wind_strength():
-    # Find how many multiples of 5 are less than 90
-    # 5, 10, 15, ..., 85 (17 values)
+                # Find how many multiples of 5 are less than 90
+                # 5, 10, 15, ..., 85 (17 values)
                 num_multiples = 90 // 5
                 # Generate a random index between 0 and num_multiples-1
                 random_index = random.randint(0, num_multiples - 1)
                 # Return the corresponding multiple of 5
                 return (random_index + 1) * 5
-            wind_speed =generate_wind_strength()
+            
+            wind_speed = generate_wind_strength()
+            
             def random_multiple_of_5(min_value, max_value):
-    # Find the first multiple of 5 >= min_value
+                # Find the first multiple of 5 >= min_value
                 lower_bound = min_value if min_value % 5 == 0 else min_value + (5 - min_value % 5)
-    
-    # Find the last multiple of 5 <= max_value
+        
+                # Find the last multiple of 5 <= max_value
                 upper_bound = max_value if max_value % 5 == 0 else max_value - (max_value % 5)
-    
-    # Calculate how many multiples of 5 are in the range
+        
+                # Calculate how many multiples of 5 are in the range
                 num_multiples = (upper_bound - lower_bound) // 5 + 1
-    
-    # Generate a random index and calculate the corresponding multiple of 5
+        
+                # Generate a random index and calculate the corresponding multiple of 5
                 random_index = random.randint(0, num_multiples - 1)
                 result = lower_bound + random_index * 5
-    
+        
                 return result
+            
             tas = random_multiple_of_5(100, 300)
             # Format wind direction for display (e.g., "270M")
             wind_dir_display = f"{wind_dir:03d}M"
@@ -482,10 +481,12 @@ def generate_question_endpoint():
                 tas=tas,
                 reference=predefined_question['reference'],
             )
-            dep1 = find_airport_by_name(dep.name, reference,airports)
-            arr1 = find_airport_by_name(arr.name,reference ,airports)
-            land1_map = find_airport_by_name(land1.name,reference ,airports)
-            land2_map = find_airport_by_name(land2.name,reference ,airports)
+            
+            dep1 = find_airport_by_name(dep.name, reference, airports)
+            arr1 = find_airport_by_name(arr.name, reference, airports)
+            land1_map = find_airport_by_name(land1.name, reference, airports)
+            land2_map = find_airport_by_name(land2.name, reference, airports)
+            
             # Calculate geodesic data
             P1 = (dep.lat, dep.long)
             P2 = (arr.lat, arr.long)
@@ -495,10 +496,15 @@ def generate_question_endpoint():
             P6 = (arr1.lat, arr1.long)
             P7 = (land1_map.lat, land1_map.long)
             P8 = (land2_map.lat, land2_map.long)
-            reference=predefined_question['reference']
+            reference = predefined_question['reference']
            
             geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas, wind_speed, wind_dir)
-            geodesic_results_1 = calculate_geodesic(P5, P6, P7, P8, tas, wind_speed,wind_speed, chart_id=reference) 
+            
+            # Only calculate map geodesic if show_map is True
+            geodesic_results_1 = None
+            if show_map:
+                geodesic_results_1 = calculate_geodesic(P5, P6, P7, P8, tas, wind_speed, wind_dir, chart_id=reference)
+            
             distance_p3 = geodesic_results['distance_to_P3_nm_1']
             distance_p4 = geodesic_results['distance_to_P4_nm']
             critical_point_data = geodesic_results.get('critical_point')
@@ -509,40 +515,41 @@ def generate_question_endpoint():
                 critical_point_obj = Point(critical_point_data['lat'], critical_point_data['long'])
             else:
                 raise ValueError(f"Invalid critical_point_data format: {critical_point_data}")   
+            
             land1_obj = Point(land1.lat, land1.long)
             land2_obj = Point(land2.lat, land2.long)        
 
-            nav=Navigation()  
+            nav = Navigation()  
             mid_house = nav.get_midpoint(critical_point_obj, land1_obj)
             mid_land1 = nav.get_midpoint(critical_point_obj, land2_obj) 
             course_from_home = nav.get_track_angle(mid_house, land2_obj)
             course_from_land1 = nav.get_track_angle(mid_land1, land2_obj)
-            def calculate_ground_speed(true_course, tas, wind_dir, wind_speed):
-                    """
-                    Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
-                    
-                    Args:
-                        true_course (float): Intended flight path in degrees (clockwise from north).
-                        tas (float): True airspeed in knots.
-                        wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
-                        wind_speed (float): Wind speed in knots.
-                    
-                    Returns:
-                        float: Ground speed in knots.
-                    """
-                    tc_rad = math.radians(true_course)
-                    wd_rad = math.radians(wind_dir)
-                    wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
-                    gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
-                    return gs
-            gs=calculate_ground_speed(course_from_home, tas, wind_dir, wind_speed)
-            cs=calculate_ground_speed(course_from_land1, tas, wind_dir, wind_speed)
-            time_p3=distance_p3/gs
-            time_p4=distance_p4/cs        # Calculate geodesic results, which include the ground speed calculations
-            time=(time_p3-time_p4)*3600
-
-
             
+            def calculate_ground_speed(true_course, tas, wind_dir, wind_speed):
+                """
+                Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
+                
+                Args:
+                    true_course (float): Intended flight path in degrees (clockwise from north).
+                    tas (float): True airspeed in knots.
+                    wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
+                    wind_speed (float): Wind speed in knots.
+                
+                Returns:
+                    float: Ground speed in knots.
+                """
+                tc_rad = math.radians(true_course)
+                wd_rad = math.radians(wind_dir)
+                wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
+                gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
+                return gs
+            
+            gs = calculate_ground_speed(course_from_home, tas, wind_dir, wind_speed)
+            cs = calculate_ground_speed(course_from_land1, tas, wind_dir, wind_speed)
+            time_p3 = distance_p3/gs
+            time_p4 = distance_p4/cs
+            time = (time_p3-time_p4)*3600
+
             if not geodesic_results:
                 logging.error("Geodesic calculation failed after retries")
                 return jsonify({'error': 'Failed to generate valid geodesic configuration. Please try again.'}), 500
@@ -551,8 +558,9 @@ def generate_question_endpoint():
             distance_p3_p4 = geodesic_results['distance_p3_p4']
             question_text = question_text.replace("is -", f" Given that the distance between {land1.name} and {land2.name} is {distance_p3_p4:.1f} nm, is -")
             
-            return jsonify({
+            response_data = {
                 'question': question_text,
+                'show_map': show_map,
                 'details': {
                     'departure': dep.code,
                     'departure_name': dep.name,
@@ -570,14 +578,28 @@ def generate_question_endpoint():
                     'shape_type': "ETP",  # Default for 2-mark questions
                     'reference': reference,
                     'geodesic': geodesic_results,
-                    'geodesic_1': geodesic_results_1,
-                    'gs':gs,
-                    'cs':cs,
-                    'time1' : time_p3,
-                    'time2' : time_p4,
-                    'time':int(time),
+                    'gs': gs,
+                    'cs': cs,
+                    'time1': time_p3,
+                    'time2': time_p4,
+                    'time': int(time),
                 }
-            })
+            }
+            
+            # Add map data only if requested
+            if show_map and geodesic_results_1:
+                response_data['details']['geodesic_1'] = geodesic_results_1
+                response_data['map_data'] = {
+                    'chart_reference': reference,
+                    'airports': {
+                        'departure': {'code': dep1.code, 'name': dep1.name, 'lat': dep1.lat, 'long': dep1.long},
+                        'arrival': {'code': arr1.code, 'name': arr1.name, 'lat': arr1.lat, 'long': arr1.long},
+                        'land1': {'code': land1_map.code, 'name': land1_map.name, 'lat': land1_map.lat, 'long': land1_map.long},
+                        'land2': {'code': land2_map.code, 'name': land2_map.name, 'lat': land2_map.lat, 'long': land2_map.long}
+                    }
+                }
+            
+            return jsonify(response_data)
             
         else:  # 3-mark questions - keep existing logic
             # Generate the base question
@@ -592,10 +614,11 @@ def generate_question_endpoint():
             wind_speed = question.details.wind_single_engine['speed']
             wind_dir = question.details.wind_single_engine['direction'] % 360
             reference = question.details.reference
-            dep1 = find_airport_by_name(dep.name, reference,airports)
-            arr1 = find_airport_by_name(arr.name,reference ,airports)
-            land1_map = find_airport_by_name(land1.name,reference ,airports)
-            land2_map = find_airport_by_name(land2.name,reference ,airports)
+            
+            dep1 = find_airport_by_name(dep.name, reference, airports)
+            arr1 = find_airport_by_name(arr.name, reference, airports)
+            land1_map = find_airport_by_name(land1.name, reference, airports)
+            land2_map = find_airport_by_name(land2.name, reference, airports)
 
             P1 = (dep.lat, dep.long)
             P2 = (arr.lat, arr.long)
@@ -606,59 +629,63 @@ def generate_question_endpoint():
             P7 = (land1_map.lat, land1_map.long)
             P8 = (land2_map.lat, land2_map.long)
             reference = question.details.reference
-            geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_normal, wind_speed, wind_dir,chart_id=reference)
-            geodesic_results_1 = calculate_geodesic(P5, P6, P7, P8, tas_normal, wind_speed, wind_dir,chart_id=reference)
+            
+            geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_normal, wind_speed, wind_dir)
+            
+            # Only calculate map geodesic if show_map is True
+            geodesic_results_1 = None
+            if show_map:
+                geodesic_results_1 = calculate_geodesic(P5, P6, P7, P8, tas_normal, wind_speed, wind_dir, chart_id=reference)
+            
             distance_p3 = geodesic_results['distance_to_P3_nm_1']
             distance_p4 = geodesic_results['distance_to_P4_nm']
             critical_point_data = geodesic_results.get('critical_point')
             
             if isinstance(critical_point_data, (list, tuple)) and len(critical_point_data) == 2:
-                    critical_point_obj = Point(critical_point_data[0], critical_point_data[1])
+                critical_point_obj = Point(critical_point_data[0], critical_point_data[1])
             elif hasattr(critical_point_data, 'lat') and hasattr(critical_point_data, 'long'):
-                    critical_point_obj = critical_point_data
+                critical_point_obj = critical_point_data
             else:
                 logging.error(f"Invalid critical_point type: {type(critical_point_data)}")
                 return jsonify({'error': f'Invalid critical_point type: {type(critical_point_data)}'}), 500
-        
-          
 
-
-        # Calculate track angles 
-            nav=Navigation()  
+            # Calculate track angles 
+            nav = Navigation()  
             mid_house = nav.get_midpoint(critical_point_obj, land1)
             mid_land1 = nav.get_midpoint(critical_point_obj, land2) 
             course_from_home = nav.get_track_angle(mid_house, land1)
             course_from_land1 = nav.get_track_angle(mid_land1, land2)
+            
             def calculate_ground_speed(true_course, tas, wind_dir, wind_speed):
-                    """
-                    Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
-                    
-                    Args:
-                        true_course (float): Intended flight path in degrees (clockwise from north).
-                        tas (float): True airspeed in knots.
-                        wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
-                        wind_speed (float): Wind speed in knots.
-                    
-                    Returns:
-                        float: Ground speed in knots.
-                    """
-                    tc_rad = math.radians(true_course)
-                    wd_rad = math.radians(wind_dir)
-                    wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
-                    gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
-                    return gs
-            gs=calculate_ground_speed(course_from_home, tas_normal, wind_dir, wind_speed)
-            cs=calculate_ground_speed(course_from_land1, tas_normal, wind_dir, wind_speed)
-            time_p3=distance_p3/gs
-            time_p4=distance_p4/cs        # Calculate geodesic results, which include the ground speed calculations
-            time=(time_p3-time_p4)*3600
-        
-           
+                """
+                Calculate ground speed given true course, true airspeed, wind direction, and wind speed.
+                
+                Args:
+                    true_course (float): Intended flight path in degrees (clockwise from north).
+                    tas (float): True airspeed in knots.
+                    wind_dir (float): Direction wind is coming from in degrees (clockwise from north).
+                    wind_speed (float): Wind speed in knots.
+                
+                Returns:
+                    float: Ground speed in knots.
+                """
+                tc_rad = math.radians(true_course)
+                wd_rad = math.radians(wind_dir)
+                wca_rad = math.asin((wind_speed / tas) * math.sin(wd_rad - tc_rad))
+                gs = tas * math.cos(wca_rad) - wind_speed * math.cos(wd_rad - tc_rad)
+                return gs
+            
+            gs = calculate_ground_speed(course_from_home, tas_normal, wind_dir, wind_speed)
+            cs = calculate_ground_speed(course_from_land1, tas_normal, wind_dir, wind_speed)
+            time_p3 = distance_p3/gs
+            time_p4 = distance_p4/cs
+            time = (time_p3-time_p4)*3600
 
             # Base question text from the generator
             full_question = question.question  # For 3-mark questions, use as-is
+            
             try:
-                doc_data={
+                doc_data = {
                     'question': full_question,
                     'details': {
                         'maganitute': course_from_home,
@@ -678,24 +705,23 @@ def generate_question_endpoint():
                         'wind_single_engine': question.details.wind_single_engine,
                         'shape_type': question.details.shape_type,
                         'reference': question.details.reference,
-                        
-                        'gs':gs,
-                        'cs':cs,
-                        'time1' : time_p3,
-                        'time2' : time_p4,
-                        'time':int(time),
-                }
+                        'gs': gs,
+                        'cs': cs,
+                        'time1': time_p3,
+                        'time2': time_p4,
+                        'time': int(time),
+                    }
                 }
                 
                 doc_ref = db.collection("questions").add(doc_data)
                 print(f"✅ Success! Document ID: {doc_ref[1].id}")
             except Exception as e:
-                    print(f"❌ Failed to write to Firestore: {str(e)}")
+                print(f"❌ Failed to write to Firestore: {str(e)}")
 
             # Prepare the response
-            return jsonify({
+            response_data = {
                 'question': full_question,
-                
+                'show_map': show_map,
                 'details': {
                     'maganitute': course_from_home,
                     'maganitute_1': course_from_land1,
@@ -715,14 +741,28 @@ def generate_question_endpoint():
                     'shape_type': question.details.shape_type,
                     'reference': question.details.reference,
                     'geodesic': geodesic_results,
-                    'geodesic_1': geodesic_results_1,
-                    'gs':gs,
-                    'cs':cs,
-                    'time1' : time_p3,
-                    'time2' : time_p4,
-                    'time':int(time),
+                    'gs': gs,
+                    'cs': cs,
+                    'time1': time_p3,
+                    'time2': time_p4,
+                    'time': int(time),
                 }
-            })
+            }
+            
+            # Add map data only if requested
+            if show_map and geodesic_results_1:
+                response_data['details']['geodesic_1'] = geodesic_results_1
+                response_data['map_data'] = {
+                    'chart_reference': reference,
+                    'airports': {
+                        'departure': {'code': dep1.code, 'name': dep1.name, 'lat': dep1.lat, 'long': dep1.long},
+                        'arrival': {'code': arr1.code, 'name': arr1.name, 'lat': arr1.lat, 'long': arr1.long},
+                        'land1': {'code': land1_map.code, 'name': land1_map.name, 'lat': land1_map.lat, 'long': land1_map.long},
+                        'land2': {'code': land2_map.code, 'name': land2_map.name, 'lat': land2_map.lat, 'long': land2_map.long}
+                    }
+                }
+            
+            return jsonify(response_data)
             
     except ValueError as ve:
         logging.error(f"ValueError: {str(ve)}")
@@ -732,6 +772,73 @@ def generate_question_endpoint():
         traceback.print_exc()
         logging.error(f"Unexpected error: {str(e)}")
         return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
+
+
+# Additional endpoint to get map data for existing questions
+@app.route('/get_map_data', methods=['POST'])
+def get_map_data_endpoint():
+    """
+    Endpoint to get map data for an existing question
+    Expected JSON payload:
+    {
+        "question_details": {...}, // The details object from a previous question
+        "reference": "L1"  // Chart reference
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'question_details' not in data or 'reference' not in data:
+            return jsonify({'error': 'Missing required parameters: question_details and reference'}), 400
+        
+        details = data['question_details']
+        reference = data['reference']
+        
+        # Extract airport information
+        dep_name = details['departure_name']
+        arr_name = details['arrival_name']
+        land1_name = details['land1_name']
+        land2_name = details['land2_name']
+        
+        # Find airports on the chart
+        dep1 = find_airport_by_name(dep_name, reference, airports)
+        arr1 = find_airport_by_name(arr_name, reference, airports)
+        land1_map = find_airport_by_name(land1_name, reference, airports)
+        land2_map = find_airport_by_name(land2_name, reference, airports)
+        
+        if not all([dep1, arr1, land1_map, land2_map]):
+            return jsonify({'error': 'Could not find all airports on the specified chart'}), 400
+        
+        # Calculate geodesic for map
+        P5 = (dep1.lat, dep1.long)
+        P6 = (arr1.lat, arr1.long)
+        P7 = (land1_map.lat, land1_map.long)
+        P8 = (land2_map.lat, land2_map.long)
+        
+        tas = details.get('tas_single_engine', details.get('tas_normal', 200))
+        wind_speed = details['wind_single_engine']['speed']
+        wind_dir = details['wind_single_engine']['direction']
+        
+        geodesic_results_1 = calculate_geodesic(P5, P6, P7, P8, tas, wind_speed, wind_dir, chart_id=reference)
+        
+        return jsonify({
+            'geodesic_1': geodesic_results_1,
+            'map_data': {
+                'chart_reference': reference,
+                'airports': {
+                    'departure': {'code': dep1.code, 'name': dep1.name, 'lat': dep1.lat, 'long': dep1.long},
+                    'arrival': {'code': arr1.code, 'name': arr1.name, 'lat': arr1.lat, 'long': arr1.long},
+                    'land1': {'code': land1_map.code, 'name': land1_map.name, 'lat': land1_map.lat, 'long': land1_map.long},
+                    'land2': {'code': land2_map.code, 'name': land2_map.name, 'lat': land2_map.lat, 'long': land2_map.long}
+                }
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logging.error(f"Error getting map data: {str(e)}")
+        return jsonify({'error': 'Failed to generate map data'}), 500
+
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({

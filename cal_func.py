@@ -307,6 +307,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         return None
     variation = get_magnetic_variation(p1p2_perp_intersection[0], p1p2_perp_intersection[1])   
     distance_to_P3_nm = (geod.Inverse(p1p2_perp_intersection[0], p1p2_perp_intersection[1], P3[0], P3[1])['s12'] / 1000) * 0.539957
+    
     if distance_to_P3_nm < 0.1:
         return None
     
@@ -336,6 +337,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         return None
     critical_point=(perp_nm_p1p2_intersection[0], perp_nm_p1p2_intersection[1])
     distance_to_P1 = geod.Inverse(perp_nm_p1p2_intersection[0], perp_nm_p1p2_intersection[1], P1[0], P1[1])['s12'] / 1000
+    disance_to_P2=geod.Inverse(perp_nm_p1p2_intersection[0], perp_nm_p1p2_intersection[1], P2[0], P2[1])['s12'] / 1000
     distance_to_P3= int(geod.Inverse(perp_nm_p1p2_intersection[0], perp_nm_p1p2_intersection[1], P3[0], P3[1])['s12'] / 1000)
     distance_to_P4=int(geod.Inverse(perp_nm_p1p2_intersection[0], perp_nm_p1p2_intersection[1], P4[0], P4[1])['s12'] / 1000)
     # Create base map with OpenSky Network tiles
@@ -369,8 +371,8 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
     folium.PolyLine(nm_geodesic, color='blue', weight=3, tooltip=f'{degree}-Degree Line').add_to(my_map)
     folium.PolyLine(perp_nm_geodesic, color='green', weight=3, tooltip='Perpendicular to P1-P2').add_to(my_map)
 
-    folium.Marker(location=p1p2_perp_intersection, popup=f'Initial Intersection\nLat: {p1p2_perp_intersection[0]:.6f}\nLon: {p1p2_perp_intersection[1]:.6f}', icon=folium.Icon(color='black', icon='info-sign')).add_to(my_map)
-    folium.Marker(location=nm_line_end_point, popup=f'{degree}-Degree Line End\nLat: {nm_line_end_point[0]:.6f}\nLon: {nm_line_end_point[1]:.6f}', icon=folium.Icon(color='blue', icon='arrow-up')).add_to(my_map)
+    folium.Marker(location=p1p2_perp_intersection, popup=f'Nil wind point\nLat: {p1p2_perp_intersection[0]:.6f}\nLon: {p1p2_perp_intersection[1]:.6f}', icon=folium.Icon(color='black', icon='info-sign')).add_to(my_map)
+    folium.Marker(location=nm_line_end_point, popup=f'{degree}-wind vector\nLat: {nm_line_end_point[0]:.6f}\nLon: {nm_line_end_point[1]:.6f}', icon=folium.Icon(color='blue', icon='arrow-up')).add_to(my_map)
     folium.Marker(location=perp_nm_p1p2_intersection, popup=f'Perpendicular Intersection\nLat: {perp_nm_p1p2_intersection[0]:.6f}\nLon: {perp_nm_p1p2_intersection[1]:.6f}', icon=folium.Icon(color='green', icon='crosshair')).add_to(my_map)
 
     points = {'P1': P1, 'P2': P2, 'C (P3)': P3, 'D (P4)': P4}
@@ -412,8 +414,8 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
             "type": "Feature",
             "properties": {
                 "name": "Perp. to P3-P4 Midline",
-                "color": "magenta",
-                "weight": 2,
+                "color": "Red",
+                "weight": 3,
                 "opacity": 0.7
             },
             "geometry": {
@@ -452,8 +454,8 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         'P2 (Arrival)': {'coords': P2, 'color': 'cadetblue', 'icon_name': 'flag-checkered', 'icon_prefix': 'fa'},
         'P3 (Critical Airport 1)': {'coords': P3, 'color': 'darkred', 'icon_name': 'hospital-o', 'icon_prefix': 'fa'},
         'P4 (Critical Airport 2)': {'coords': P4, 'color': 'darkred', 'icon_name': 'hospital-o', 'icon_prefix': 'fa'},
-        'Initial Intersection': {'coords': p1p2_perp_intersection, 'color': 'black', 'icon_name': 'circle-o', 'icon_prefix': 'fa'},
-        f'Offset Line End ({degree}°)': {'coords': nm_line_end_point, 'color': 'darkblue', 'icon_name': 'arrow-right', 'icon_prefix': 'fa'},
+        'NIL Wind': {'coords': p1p2_perp_intersection, 'color': 'black', 'icon_name': 'circle-o', 'icon_prefix': 'fa'},
+        f'WIND VECTOR ({degree}°)': {'coords': nm_line_end_point, 'color': 'darkblue', 'icon_name': 'arrow-right', 'icon_prefix': 'fa'},
         'Critical Point (CP)': {'coords': perp_nm_p1p2_intersection, 'color': 'red', 'icon_name': 'crosshairs', 'icon_prefix': 'fa'}
     }
     for name, p_info in points_definitions.items():
@@ -483,6 +485,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         'distance_to_degree': distance_to_degree,
         'geojson': geojson_data,
         'map_html': map_html_output,
+        'distance_to_p2_nm':disance_to_P2,
         
         "OPTION-A": distance_to_P1 * 0.539957,
         "OPTION-B": (distance_to_P1 * 0.539957)+190,
@@ -520,9 +523,14 @@ def get_magnetic_variation(lat, lon, date=None):
 
 def calculate_geodesic1(P1, P2, P3, P4, TAS, wind_speed, degree):
     geod = Geodesic.WGS84
+    g_P1_P2 = geod.Inverse(P1[0], P1[1], P2[0], P2[1])
     g_P3_P4 = geod.Inverse(P3[0], P3[1], P4[0], P4[1])
     distance_P3_P4_nm = g_P3_P4['s12'] / 1852  
-
+    distance_P1_P2_nm= g_P1_P2['s12'] / 1852
+    if distance_P3_P4_nm >= (distance_P1_P2_nm*0.85):
+        logging.warning("P3-P4 distance is too close to P1-P2, returning None")
+        return None
+        
     def geodesic_intersection(line1_start, line1_end, line2_start, line2_end):
         def distance_between_lines(params):
             s1, s2 = params
@@ -671,13 +679,13 @@ def calculate_geodesic1(P1, P2, P3, P4, TAS, wind_speed, degree):
     MousePosition().add_to(my_map)
 
     folium.PolyLine(p1_p2_geodesic, color='purple', weight=3, tooltip='P1 to P2').add_to(my_map)
-    folium.PolyLine(p3_p4_geodesic, color='orange', weight=3, tooltip='P3 to P4').add_to(my_map)
+    folium.PolyLine(p3_p4_geodesic, color='Red', weight=4, tooltip='P3 to P4').add_to(my_map)
     folium.PolyLine(perp_geodesic, color='red', weight=3, tooltip='Perpendicular Line').add_to(my_map)
     folium.PolyLine(nm_geodesic, color='blue', weight=3, tooltip=f'{degree}-Degree Line').add_to(my_map)
     folium.PolyLine(perp_nm_geodesic, color='green', weight=3, tooltip='Perpendicular to P1-P2 (North-South)').add_to(my_map)
 
-    folium.Marker(location=p1p2_perp_intersection, popup=f'Initial Intersection\nLat: {p1p2_perp_intersection[0]:.6f}\nLon: {p1p2_perp_intersection[1]:.6f}', icon=folium.Icon(color='black', icon='info-sign')).add_to(my_map)
-    folium.Marker(location=nm_line_end_point, popup=f'{degree}-Degree Line End\nLat: {nm_line_end_point[0]:.6f}\nLon: {nm_line_end_point[1]:.6f}', icon=folium.Icon(color='blue', icon='arrow-up')).add_to(my_map)
+    folium.Marker(location=p1p2_perp_intersection, popup=f'Nil wind point\nLat: {p1p2_perp_intersection[0]:.6f}\nLon: {p1p2_perp_intersection[1]:.6f}', icon=folium.Icon(color='black', icon='info-sign')).add_to(my_map)
+    folium.Marker(location=nm_line_end_point, popup=f'{degree}-wind vector\nLat: {nm_line_end_point[0]:.6f}\nLon: {nm_line_end_point[1]:.6f}', icon=folium.Icon(color='blue', icon='arrow-up')).add_to(my_map)
     folium.Marker(location=perp_nm_p1p2_intersection, popup=f'Perpendicular Intersection\nLat: {perp_nm_p1p2_intersection[0]:.6f}\nLon: {perp_nm_p1p2_intersection[1]:.6f}', icon=folium.Icon(color='green', icon='crosshair')).add_to(my_map)
     folium.Marker(location=perp_nm_point1, popup=f'Perp NM Point 1 (North)\nLat: {perp_nm_point1[0]:.6f}\nLon: {perp_nm_point1[1]:.6f}', icon=folium.Icon(color='red', icon='star')).add_to(my_map)
     folium.Marker(location=perp_nm_point2, popup=f'Perp NM Point 2 (South)\nLat: {perp_nm_point2[0]:.6f}\nLon: {perp_nm_point2[1]:.6f}', icon=folium.Icon(color='red', icon='star')).add_to(my_map)
@@ -693,7 +701,7 @@ def calculate_geodesic1(P1, P2, P3, P4, TAS, wind_speed, degree):
         "type": "FeatureCollection",
         "features": [
             {"type": "Feature", "properties": {"name": "P1 to P2", "color": "purple"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in p1_p2_geodesic]}},
-            {"type": "Feature", "properties": {"name": "P3 to P4", "color": "orange"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in p3_p4_geodesic]}},
+            {"type": "Feature", "properties": {"name": "P3 to P4", "color": "Red"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in p3_p4_geodesic]}},
             {"type": "Feature", "properties": {"name": "Perpendicular Line", "color": "red"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in perp_geodesic]}},
             {"type": "Feature", "properties": {"name": f"{degree}-Degree Line", "color": "blue"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in nm_geodesic]}},
             {"type": "Feature", "properties": {"name": "Perpendicular to P1-P2 (North-South)", "color": "green"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in perp_nm_geodesic]}}
@@ -724,6 +732,7 @@ def calculate_geodesic1(P1, P2, P3, P4, TAS, wind_speed, degree):
         'distance_to_P3_nm': distance_to_P3_nm,
         'distance_to_degree': distance_to_degree,
         'geojson': geojson_data,
+        
         'map_html': map_html,
         "OPTION-A": distance_to_P1 * 0.539957,
         "OPTION-B": (distance_to_P1 * 0.539957) + 190,
