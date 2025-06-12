@@ -84,14 +84,16 @@ except ImportError:
 
 # ## NEW ##: Helper function to get the real client IP address
 def get_client_ip():
-        """
-        Correctly identifies the client's IP address, even behind a reverse proxy.
-        """
-        if request.headers.getlist("X-Forwarded-For"):
-            ip = request.headers.getlist("X-Forwarded-For")[0]
-        else:
-            ip = request.remote_addr
-        return ip
+    """
+    Correctly identifies the client's IP address, even behind a reverse proxy.
+    Only returns the first IP from X-Forwarded-For, which is the real client.
+    """
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()  # first IP is the client
+    else:
+        ip = request.remote_addr
+    return ip
 
 # ---- All your existing helper functions and classes remain here ----
 class Navigation:
