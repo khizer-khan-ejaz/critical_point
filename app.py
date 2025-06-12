@@ -83,7 +83,7 @@ except ImportError:
 # ==============================================================================
 
 # ## NEW ##: Helper function to get the real client IP address
-    def get_client_ip():
+def get_client_ip():
         """
         Correctly identifies the client's IP address, even behind a reverse proxy.
         """
