@@ -378,7 +378,7 @@ airports = [
         Airport("YEML", "Emerald ", -23.2742, 148.1314, "L4"),
         Airport("YHUG", "Hughenden ", -20.5531, 144.0953, "L4"),
         Airport("YLRE", "Longreach ", -23.4280, 144.4070, "L4"),
-        Airport("YBCV", "Charleville ",  -26.4853, 146.5796, "L4"),
+        Airport("YBCV", "Charleville ",  -26.4902, 146.5192, "L4"),
         Airport("YSGE", "St George ", -28.0526, 148.8455, "L4"),
         Airport("YWLG", "Walgett ",  -30.1499,148.5406, "L4"),
         Airport("YMOR", "Moree ", -29.5113, 150.0870, "L4"),

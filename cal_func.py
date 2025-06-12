@@ -473,7 +473,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
     key_points = {"Initial Intersection": p1p2_perp_intersection, f"{degree}-Degree Line End": nm_line_end_point, "Perpendicular Intersection": perp_nm_p1p2_intersection}
     for label, coords in key_points.items():
         geojson_data["features"].append({"type": "Feature", "properties": {"name": label}, "geometry": {"type": "Point", "coordinates": [coords[1], coords[0]]}})
-        
+       
     
     results = {
         'p1p2_perp_intersection': {'lat': p1p2_perp_intersection[0], 'lon': p1p2_perp_intersection[1]},
@@ -485,7 +485,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         'distance_to_degree': distance_to_degree,
         'geojson': geojson_data,
         'map_html': map_html_output,
-        'distance_to_p2_nm':disance_to_P2,
+      
         
         "OPTION-A": distance_to_P1 * 0.539957,
         "OPTION-B": (distance_to_P1 * 0.539957)+190,

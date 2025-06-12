@@ -7,6 +7,8 @@ from cal_func import calculate_geodesic1
 from geographiclib.geodesic import Geodesic
 import datetime
 from pygeomag import GeoMag
+import groq
+from typing import Optional
 geo = GeoMag()
 class Airport:
     def __init__(self, code, name, lat, long, reference):
@@ -150,6 +152,7 @@ class QuestionDetails(NamedTuple):
     wind_single_engine: Dict
     shape_type: str
     reference: str
+    rondom_choice:str
 
 class CurrentQuestion(NamedTuple):
     question: str
@@ -494,16 +497,136 @@ class AirportQuestionGenerator:
                 if rounded_speed >= 90:
                     rounded_speed = 85
                 wind_speed_single = int(rounded_speed)
+                reference_point = random.choice([dep.name, arr.name])
+                cp_sentence_options = [
+                (f"Your calculation of the location of the single engine CP (Critical Point) ", False),  # Use single engine
+                (f"Your calculated CP location for  ", True)              # Use normal ops
+            ]
+                cp_phrase, use_normal_data = random.choice(cp_sentence_options)
+                if use_normal_data:
+                    tas_used = tas_normal
+                    wind_dir_used = wind_dir_normal
+                    wind_speed_used = wind_speed_normal
+                else:
+                    tas_used = tas_single_engine
+                    wind_dir_used = wind_dir_single
+                    wind_speed_used = wind_speed_single
+                                
+                def get_random_question_template():
+                    question_text_1 = (
+                        f"Refer ERC {selected['reference']}. You are planning a flight from {dep.name}({dep.code}) to {arr.name}({arr.code}) "
+                        f"direct at FL{cruise_level} with a TAS of {tas_normal} kt for normal operations "
+                        f"and single engine TAS of {tas_single_engine} kt. WV {wind_dir_normal}M / {wind_speed_normal} kt "
+                        f"at FL{cruise_level} (normal ops crz), WV {wind_dir_single}M / {wind_speed_single} kt for single "
+                        f"engine cruise level. {cp_phrase} "
+                        f"for {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, measured as a distance "
+                        f"from {reference_point} is -"
+                    )
+                    question_text_2 = (
+                        f"Refer ERC {selected['reference']}.\n You are en route from   {dep.name}({dep.code}) to {arr.name}({arr.code}) "
+                        f"The in-flight details include a with a TAS of {tas_used} knots "
+                        f" a wind velocity obtained from the FMS of {wind_dir_used}°(M)/{wind_speed_used}KT"
+                        f" Due to a possible technical issue you decide to calculate the position of the ETP"
+                        f"between {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, ETP  "
+                        f"from {reference_point} is -"
+                    )
+                    question_text_3 = (
+                        f"Refer ERC {selected['reference']} from {dep.name}({dep.code}) to {arr.name}({arr.code}) "
+                        f"The in-flight details include a TAS  {tas_used} knots  and "
+                        f"and a wind velocity obtained from the FMS of  {wind_dir_used}M / {wind_speed_used} kt  "
+                        f"technical issue you decide to calculate the position of the ETP between "
+                        f"for {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, measured as a distance "
+                        f"from {reference_point} is -"
+                    )
+
+                    templates = [question_text_1, question_text_2, question_text_3]
+                    return random.choice(templates)
+
+                question_text=get_random_question_template()
                 
-                question_text = (
-                    f"Refer ERC {selected['reference']}. You are planning a flight from {dep.name}{dep.code} to {arr.name}{arr.code} "
-                    f"direct at FL{cruise_level} with a TAS of {tas_normal} kt for normal operations "
-                    f"and single engine TAS of {tas_single_engine} kt. WV {wind_dir_normal}M / {wind_speed_normal} kt "
-                    f"at FL{cruise_level} (normal ops crz), WV {wind_dir_single}M / {wind_speed_single} kt for single "
-                    f"engine cruise level. Your calculation of the location of the single engine CP (Critical Point) "
-                    f"for {eland.name} and {eland2.name}, on the {dep.code} - {arr.code} track, measured as a distance "
-                    f"from {dep.name} is -"
-                )
+                
+                def refine_question_with_groq(question_text: str, api_key: Optional[str] = None) -> str:
+                        """
+                        Refine the aviation question text using Groq API to make it more clear and professional.
+                        
+                        Args:
+                            question_text: The original question text to be refined
+                            api_key: Optional Groq API key. If not provided, will use GROQ_API_KEY environment variable
+                            
+                        Returns:
+                            Refined question text
+                            
+                        Raises:
+                            ValueError: If API key is not available or API call fails
+                        """
+                        # Get API key
+                        api_key = "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"
+                        if not api_key:
+                            raise ValueError("Groq API key not provided and GROQ_API_KEY environment variable not set")
+                        
+                        # Initialize Groq client
+                        client = groq.Client(api_key=api_key)
+                        
+                        # Create the prompt
+                        prompt = f"""
+                       **Role**: You are a senior flight operations examiner responsible for drafting and refining commercial pilot navigation exam questions. Your task is to rephrase the following navigation scenario into a precise, professionally formatted test question.
+
+**Guidelines**:
+1. Preserve all technical data exactly as provided (TAS, altitudes, waypoints, wind data)
+2. Use proper ICAO standard phraseology and terminology throughout
+3. Ensure measurement instructions are unambiguous and exam-appropriate
+4. Use proper aviation grammar and sentence structure
+
+**Input Question**:
+{question_text}
+
+**Output Requirements**:
+- Begin with proper ERC chart reference format
+- State departure and destination airports with ICAO codes
+- Specify flight level clearly
+- Group performance data logically (normal operations first, then single-engine)
+
+
+**Expected Output Format**:
+
+
+Please refine the input question following these guidelines.
+    
+                        """
+
+                        
+                        try:
+                            # Make the API call
+                            chat_completion = client.chat.completions.create(
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": "You are an aviation expert who specializes in refining technical flight planning questions."
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": prompt
+                                    }
+                                ],
+                                model="llama-3.3-70b-versatile",
+                                temperature=0,  # Keep it precise
+                                max_tokens=500
+                            )
+                            
+                            # Extract and return the refined text
+                            refined_text = chat_completion.choices[0].message.content
+                            
+                            # Clean up any extra quotes or formatting
+                            refined_text = refined_text.strip('"').strip()
+                            
+                            return refined_text
+                            
+                        except Exception as e:
+                            raise ValueError(f"Failed to refine question with Groq API: {str(e)}") from e
+
+                #print(question_text)
+               
+                
                 
                 details = QuestionDetails(
                     departure=dep,
@@ -512,11 +635,13 @@ class AirportQuestionGenerator:
                     land2=eland2,
                     cruise_level=cruise_level,
                     tas_normal=tas_normal,
-                    tas_single_engine=tas_single_engine,
-                    wind_normal={"direction": wind_dir_normal, "speed": wind_speed_normal},
-                    wind_single_engine={"direction": wind_dir_single, "speed": wind_speed_single},
+                    tas_single_engine=tas_used,
+                    wind_normal={"direction": wind_dir_used, "speed": wind_speed_normal},
+                    wind_single_engine={"direction": wind_dir_used, "speed": wind_speed_used},
                     shape_type=selected["shapeType"],
-                    reference=selected["reference"]
+                    reference=selected["reference"],
+                    rondom_choice=reference_point
+               
                 )
                 
                 question = CurrentQuestion(question=question_text, details=details)
