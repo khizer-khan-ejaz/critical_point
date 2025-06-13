@@ -629,7 +629,7 @@ def generate_question_endpoint():
                 "step_number": 1,
                 "title": "Calculate Critical Point Distance",
                 "description": f"Draw a line from {land1.name} to {land2.name}. Mark the point halfway along the {dep.code}-{arr.code} line. ",
-                "calculation": f"This distance should be {P3toP4}NM and the mid-point should be {P3toP4/2}NM.",
+                "calculation": f"This distance should be { int(P3toP4)}NM and the mid-point should be {P3toP4/2}NM.",
                 "result": " nautical miles"
             },
             {
@@ -652,14 +652,14 @@ def generate_question_endpoint():
                                     to either airport is {distance_to_P3_nm}NM
                                     The nil wind time to either airport is {distance_to_P3_nm/tas_single} hours (Dist./TAS).  
 
-                                    The wind is {wind_speed} knots (at single engine cruse level), {distance_to_P3_nm/tas_single}hrs worth is ({distance_to_P3_nm/tas_single} x {wind_speed} = {degreesdistance} NM.) 
+                                    The wind is {wind_speed} knots (at single engine cruse level), {distance_to_P3_nm/tas_single}hrs worth is ({distance_to_P3_nm/tas_single} x {wind_speed} = {int(degreesdistance)} NM.) 
                                        '''
             },
             {
                 "step_number": 4,
                 "title": f"Using a protractor draw a wind vector from the nil wind ETP",
                 "description": f"From the nil wind ETP {degreesdistance} on wind vector.Now draw a line  parallel to the original line that bisects {land1.name} and {land2.name} .Where this line  intersects the {dep.code}-{arr.code} track is the actual ETP for continuing to {land1.name}  or  diverting to {land2.name}. ",
-                "result": f"In this case the actual ETP lies {distance_p1}nm from {dep.name}, or {distancefrom2}nm from {arr.name}.  "
+                "result": f"In this case the actual ETP lies {int(distance_p1)}nm from {dep.name}, or {int(distancefrom2)}nm from {arr.name}.  "
             },
             {
                 "step_number": 5,
@@ -685,10 +685,10 @@ def generate_question_endpoint():
         ]
 
             options = {
-                        "option1": cp_distance,
-                        "option2": cp_distance + 27,
-                        "option3": cp_distance - 27,
-                        "option4": cp_distance + 40,
+                        "A": cp_distance,
+                        "B": cp_distance + 27,
+                        "C": cp_distance - 27,
+                        "D": cp_distance + 40,
                     }
 
         
