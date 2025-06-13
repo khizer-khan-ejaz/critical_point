@@ -44,7 +44,7 @@ app.config["JWT_SECRET_KEY"] = "a-very-strong-and-secret-key-that-you-should-cha
 # This is the list of IP addresses that are allowed to request a token.
 # "127.0.0.1" is your local machine (localhost).
 # Replace 'YOUR_CLIENT_IP_HERE' with the actual public IP addresses of your clients.
-app.config["ALLOWED_IPS"] = ["127.0.0.1", "82.25.126.162","https://pilottrainingaustralia.unibooker.app"] 
+app.config["ALLOWED_IPS"] = ["127.0.0.1", "82.25.126.162","43.204.137.19"] 
 
 # Initialize the JWT manager
 jwt = JWTManager(app)
