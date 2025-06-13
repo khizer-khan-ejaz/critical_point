@@ -9,6 +9,7 @@ import datetime
 from pygeomag import GeoMag
 import groq
 from typing import Optional
+from fuzzywuzzy import fuzz
 geo = GeoMag()
 class Airport:
     def __init__(self, code, name, lat, long, reference):
@@ -293,7 +294,7 @@ class AirportQuestionGenerator:
             wind_factor = 1.0 + (wind_speed / tas) * 0.2
         
         return cp_distance * wind_factor
-    
+   
     def select_airports_for_shape_with_reference(self, specified_reference, num_airports):
         attempts = 0
         max_attempts = 1000
@@ -428,7 +429,52 @@ class AirportQuestionGenerator:
                 P2 = (arr.lat, arr.long)
                 P3 = (eland.lat, eland.long)
                 P4 = (eland2.lat, eland2.long)
+                def find_airport_by_name(name, reference, airports):
+                    if not name or not airports:
+                        # Using print for direct feedback, but logging is better
+                        print("Invalid input: name or airports list is empty")
+                        return None
+                    name_lower, name_upper = name.lower().strip(), name.upper().strip()
+                    reference_list = []
+                    if isinstance(reference, list):
+                        reference_list = [ref.upper().strip() for ref in reference if isinstance(ref, str) and ref.strip()]
+                    elif isinstance(reference, str) and reference.strip():
+                        reference_list = [reference.upper().strip()]
+                    
+                    candidates = []
+                    for airport in airports:
+                        score = 0
+                        airport_name_clean = airport.name.lower().strip()
+                        airport_code_lower = airport.code.lower().strip()
+                        airport_reference = airport.reference.upper().strip() if airport.reference else ""
+                        
+                        if name_lower == airport_name_clean: score += 100
+                        if name_upper == airport.code: score += 95
+                        if reference_list and airport_reference in reference_list: score += 90
+                        if airport_name_clean.startswith(name_lower): score += 85
+                        fuzzy_score = fuzz.ratio(name_lower, airport_name_clean)
+                        if fuzzy_score >= 80: score += fuzzy_score * 0.75
+                        if name_lower in airport_name_clean: score += 65
+                        
+                        if score > 0:
+                            candidates.append({"airport": airport, "score": score})
+                    
+                    if candidates:
+                        return max(candidates, key=lambda x: x["score"])["airport"]
+                    
+                    print(f"No match found for '{name}'")
+                    return None
+                dep1 = find_airport_by_name(dep.name, specified_reference, airports)
+                arr1 = find_airport_by_name(arr.name, specified_reference, airports)
+                land1_map = find_airport_by_name(eland.name, specified_reference, airports)
+                land2_map = find_airport_by_name(eland2.name, specified_reference, airports)
+                P5 = (dep1.lat, dep1.long)
+                P6 = (arr1.lat, arr1.long)
+                P7 = (land1_map.lat, land1_map.long)
+                P8 = (land2_map.lat, land2_map.long)
                 
+
+
                 p1p2 = geod.Inverse(P1[0], P1[1], P2[0], P2[1])
                 p1p2_dist = p1p2['s12'] / 1852.0
                 p3p4 = geod.Inverse(P3[0], P3[1], P4[0], P4[1])
@@ -655,8 +701,9 @@ Please refine the input question following these guidelines.
                     continue
                 
                 geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_single, wind_speed_single, wind_dir_single)
+                geodesic_results_1=calculate_geodesic1(P5,P6,P7,P8,tas_single,wind_speed_single,wind_dir_single)
                 
-                if geodesic_results is None:
+                if geodesic_results and geodesic_results_1 is None:
                     logging.warning(f"Geodesic calculation failed for: {dep.code}-{arr.code}-{eland.code}-{eland2.code}")
                     continue
                 

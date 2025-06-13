@@ -484,13 +484,7 @@ def calculate_geodesic(P1, P2, P3, P4, TAS, wind_speed, degree,chart_id):
         'distance_to_P3_nm': distance_to_P3_nm,
         'distance_to_degree': distance_to_degree,
         'geojson': geojson_data,
-        'map_html': map_html_output,
-      
-        
-        "OPTION-A": distance_to_P1 * 0.539957,
-        "OPTION-B": (distance_to_P1 * 0.539957)+190,
-        "OPTION-C": (distance_to_P1 * 0.539957)-190,
-        "OPTION-D": (distance_to_P1 * 0.539957)-100,
+        'map_html': map_html_output,       
         'distance_p3_p4': distance_P3_P4_nm,
         'distance_to_P3_nm_1': (distance_to_P3 * 0.539957),
         'distance_to_P4_nm': (distance_to_P4 * 0.539957),
@@ -734,10 +728,6 @@ def calculate_geodesic1(P1, P2, P3, P4, TAS, wind_speed, degree):
         'geojson': geojson_data,
         
         'map_html': map_html,
-        "OPTION-A": distance_to_P1 * 0.539957,
-        "OPTION-B": (distance_to_P1 * 0.539957) + 190,
-        "OPTION-C": (distance_to_P1 * 0.539957) - 190,
-        "OPTION-D": (distance_to_P1 * 0.539957) - 100,
         'distance_p3_p4': distance_P3_P4_nm,
         'distance_to_P3_nm_1': (distance_to_P3 * 0.539957),
         'distance_to_P4_nm': (distance_to_P4 * 0.539957),

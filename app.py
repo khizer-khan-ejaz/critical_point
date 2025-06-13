@@ -560,6 +560,8 @@ def generate_question_endpoint():
             reference = question.details.reference
             
             geodesic_results = calculate_geodesic1(P1, P2, P3, P4, tas_single, wind_speed, wind_dir)
+            geodesic_results_2=calculate_geodesic1(P5, P6, P7, P8, tas_single, wind_speed, wind_dir)
+            
             distance_to_P3_nm=geodesic_results['distance_to_P3_nm']
             degreesdistance=geodesic_results['distance_to_degree']           
             # Only calculate map geodesic if show_map is True
@@ -682,6 +684,12 @@ def generate_question_endpoint():
             }
         ]
 
+            options = {
+                        "option1": cp_distance,
+                        "option2": cp_distance + 27,
+                        "option3": cp_distance - 27,
+                        "option4": cp_distance + 40,
+                    }
 
         
             
@@ -743,7 +751,8 @@ def generate_question_endpoint():
                     'reference': question.details.reference,
                     'geodesic': geodesic_results,
                     'Ans':cp_distance,
-                    'Ans2':distancefrom2,
+                    'options':options,   
+                    
                     'gs': gs,
                     'cs': cs,
                     'time1': time_p3,
